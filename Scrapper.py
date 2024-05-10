@@ -2,7 +2,6 @@ from bs4 import BeautifulSoup
 import requests
 import pandas as pd
 import re
-import csv
 import os
 lista = []
 lista2 = []
@@ -11,13 +10,6 @@ file1 = "scrapped_data_time.csv"
 file2 = "scrapped_data_name.csv"
 #if os.path.exists("./"+file1): os.remove("./"+file1)
 #if os.path.exists("./"+file2): os.remove("./"+file2)
-
-# html = '<html><body><div><div><main><div><div><div><div class="GameStats_game_times__KHrRY shadow_shadow"><ul><li><h5></h5></ul></li></div></div></div></div></main></div></div></body><html>'
-# soup = BeautifulSoup.BeautifulSoup(html)
-
-# page = requests.get(f"https://howlongtobeat.com/game/1",headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0"})
-# soup = BeautifulSoup(page.text, "html.parser")
-# print(soup.body.div(attrs={"id":"__next"})[0].div(attrs={"class":"Layout_countainer___dzs2"}))
 
 for Num in range(1,151000): 
     print(f"Pagina https://howlongtobeat.com/game/{Num}")
