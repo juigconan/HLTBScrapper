@@ -2,29 +2,39 @@ from bs4 import BeautifulSoup
 import requests
 import pandas as pd
 import re
+import csv
+import os
 lista = []
 lista2 = []
-index = 1
-count = 0
+lista3 = []
+file1 = "scrapped_data_time.csv"
+file2 = "scrapped_data_name.csv"
+#if os.path.exists("./"+file1): os.remove("./"+file1)
+#if os.path.exists("./"+file2): os.remove("./"+file2)
 
-# html = '<html><body><div><div><main><div><div><div><div class="GameStats_game_times__KHrRY shadow_shadow"><ul><li><h5></h5></ul></li></div></div></div></div></main></div></div></body></html>'
+# html = '<html><body><div><div><main><div><div><div><div class="GameStats_game_times__KHrRY shadow_shadow"><ul><li><h5></h5></ul></li></div></div></div></div></main></div></div></body><html>'
 # soup = BeautifulSoup.BeautifulSoup(html)
 
 # page = requests.get(f"https://howlongtobeat.com/game/1",headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0"})
 # soup = BeautifulSoup(page.text, "html.parser")
 # print(soup.body.div(attrs={"id":"__next"})[0].div(attrs={"class":"Layout_countainer___dzs2"}))
 
-
-
-while count <= 30:
-    file = open(f"scrapped_data{count}.csv", "w")
-    for Num in range(0,5000): 
-        print(f"Pagina https://howlongtobeat.com/game/{Num}")
-        page = requests.get(f"https://howlongtobeat.com/game/{Num}",headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0"})
-        soup = BeautifulSoup(page.text, "html.parser")
-        lista.append(soup.find_all("li", class_=re.compile("^GameStats_short__tSJ6I time_")))
-
-    df = pd.DataFrame(lista)
-    df.columns = ["Main", "Main + Sides", "Completionist", "All Styles"]
-
-    df.to_csv(file)
+for Num in range(1,151000): 
+    print(f"Pagina https://howlongtobeat.com/game/{Num}")
+    page = requests.get(f"https://howlongtobeat.com/game/{Num}",headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0"})
+    soup = BeautifulSoup(page.text, "html.parser")
+    lista.append(soup.find_all("li", class_=re.compile("^GameStats_short__tSJ6I time_")))
+    lista2.append(soup.find_all("div", class_="GameHeader_profile_header__q_PID shadow_text"))
+    lista3.append(Num)
+    if(Num % 10 == 0 and Num != 0):
+        df1 = pd.DataFrame(lista)
+        df2 = pd.DataFrame(lista2)
+        df3 = pd.DataFrame(lista3)
+        df4 = pd.merge(df3, df1, left_index=True, right_index=True)
+        df5 = pd.merge(df3, df2, left_index=True, right_index=True)
+        df4.columns = ["hltbIndex","Main", "Main + Sides", "Completionist", "All Styles"]
+        df4.to_csv(file1, mode='a', header=not os.path.exists(file1))
+        df5.to_csv(file2, mode='a', header=not os.path.exists(file2))
+        lista = []
+        lista2 = []
+        lista3 = []
