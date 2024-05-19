@@ -11,8 +11,9 @@ failList = []
 timeFile = "scrapped_data_time.csv"
 nameFile = "scrapped_data_name.csv"
 failFile = "scrapped_data_fail.csv"
-start = 29832
-#if os.path.exists("./"+file1): os.ºremove("./"+file1)
+start = 0
+#if os.path.exists("./"+file1): os.remove("./"+file1)
+#if os.path.exists("./"+file2): os.remove("./"+file2)
 #if os.path.exists("./"+file2): os.remove("./"+file2)
 
 for gameIndex in range(start, 151000): 
