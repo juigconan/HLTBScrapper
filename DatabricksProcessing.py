@@ -24,7 +24,8 @@ prefixProcessed = f"abfss://processed@{blob}.dfs.core.windows.net/%s" % "%s"
 # Configuración conexion base de datos
 dbUrl = dbutils.secrets.get(scope="scopegamechoice",key="dbUrl")
 dbName = dbutils.secrets.get(scope="scopegamechoice",key="dbName")
-dbTable = dbutils.secrets.get(scope="scopegamechoice",key="dbTable")
+dbTableFinal = dbutils.secrets.get(scope="scopegamechoice",key="dbTableFinal")
+dbTableHltb = dbutils.secrets.get(scope="scopegamechoice",key="dbTableHltb")
 dbUser = dbutils.secrets.get(scope="scopegamechoice",key="dbUser")
 dbPass = dbutils.secrets.get(scope="scopegamechoice",key="dbPass")
 
@@ -37,8 +38,11 @@ spark.conf.set("mapreduce.fileoutputcommitter.marksuccessfuljobs", "false")
 
 tempPath = prefixProcessed % "temp.csv"
 
-def saveDf(df,saveRoute):
-    df.repartition(1).write.mode("overwrite").format('com.databricks.spark.csv').save(saveRoute,header = 'true')
+def saveDf(df,saveRoute, mode='csv'):
+    if (mode == 'csv'):
+        df.repartition(1).write.mode("overwrite").format('com.databricks.spark.csv').save(saveRoute,header = 'true')
+    if (mode == 'json'):
+        df.repartition(1).write.mode("overwrite").format('json').save(saveRoute)
     sleep(0.2)
     file = re.search("part([^'])*",(dbutils.fs.ls(saveRoute)[0])[0])[0]
     loadPoint = "%s/%s" % (saveRoute, file)
@@ -60,6 +64,7 @@ timeRawFile = prefixRaw % "scrapped_data_time.csv"
 nameRawFile = prefixRaw % "scrapped_data_name.csv"
 steamRawFile = prefixRaw % "steam_games.json"
 hltbSinkFile = prefixProcessed % "scrapped_data_complete.csv"
+steamSinkFile = prefixProcessed % "steam_games_processed.json"
 
 # Función para limpiar el nombre
 def cleanName(row):
@@ -83,18 +88,27 @@ dfNameProcessed = dfNameRaw.withColumns({"hltbIndex":col("0_x").cast(IntegerType
 
 # Dataframe de Steam
 dfSteamGames = spark.read.option("header", "true").format("json").load(steamRawFile).select("applist.*").withColumn("apps", explode("apps")).select("apps.*").withColumnsRenamed({"name": "Name", "appid": "steamIndex"})
+saveDf(dfSteamGames, steamSinkFile, "json")
 
 # Dataframe con horas y nombre
-dfHltb = dfNameProcessed.join(dfTimeProcessed, "hltbIndex").withColumns({"Main": udfCleanHours("Main").cast(DoubleType()),"Main + Sides":udfCleanHours("Main + Sides").cast(DoubleType()),"Completionist":udfCleanHours("Completionist").cast(DoubleType()),"All Styles":udfCleanHours("All Styles").cast(DoubleType())})
+dfHltb = dfNameProcessed.join(dfTimeProcessed, "hltbIndex").withColumns({"Main": udfCleanHours("Main").cast(DoubleType()),"Main + Sides":udfCleanHours("Main + Sides").cast(DoubleType()),"Completionist":udfCleanHours("Completionist").cast(DoubleType()),"All Styles":udfCleanHours("All Styles").cast(DoubleType())}).select("*")
 saveDf(dfHltb, hltbSinkFile)
-dfHltbProcessed = spark.read.option("header", "true").format("csv").load(hltbSinkFile)
+dfHltbProcessed = spark.read.option("header", "true").format("csv").load(hltbSinkFile).withColumns({"Main": col("Main").cast(DoubleType()),"Main + Sides": col("Main + Sides").cast(DoubleType()),"Completionist": col("Completionist").cast(DoubleType()),"All Styles": col("All Styles").cast(DoubleType())})
 
 # Dataframe con el join final
 dfFinal = dfSteamGames.join(dfHltbProcessed, "Name").select("hltbIndex", "steamIndex", "Name", "Main", "Main + Sides", "Completionist", "All Styles")
 
+# Guardamos los datos en la base de datos
+dfHltbProcessed.write.format('jdbc').options( \
+      url=dbUrl, \
+      database=dbName, \
+      dbtable=dbTableHltb, \
+      user=dbUser, \
+      password=dbPass).mode('overwrite').save()
+      
 dfFinal.write.format('jdbc').options( \
       url=dbUrl, \
       database=dbName, \
-      dbtable=dbTable, \
+      dbtable=dbTableFinal, \
       user=dbUser, \
       password=dbPass).mode('overwrite').save()
