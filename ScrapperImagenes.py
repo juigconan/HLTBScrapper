@@ -6,10 +6,10 @@ import os
 imageList = []
 numList = []
 imageFile = "scrapped_data_image.csv"
-start = 0
+start = 69068
 end = 151000
 # Descomentar para rehacer el archivo
-if os.path.exists("./"+imageFile): os.remove("./"+imageFile)
+# if os.path.exists("./"+imageFile): os.remove("./"+imageFile)
 
 for gameIndex in range(start, end): 
     print(f"Pagina https://howlongtobeat.com/game/{gameIndex}")
