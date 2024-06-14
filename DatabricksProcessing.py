@@ -3,6 +3,8 @@ import re
 from pyspark.sql.functions import col, split, udf, explode, col
 from pyspark.sql.types import IntegerType, DoubleType, StringType
 from time import sleep
+from bs4 import BeautifulSoup
+import requests
 
 # COMMAND ----------
 
@@ -52,7 +54,6 @@ def saveDf(df,saveRoute, mode='csv'):
 
 # COMMAND ----------
 
-
 # Variables para las expresiones regulares
 regexTime = "(<\/?h5>)"
 regexNameStart = '">'
@@ -64,7 +65,11 @@ timeRawFile = prefixRaw % "scrapped_data_time.csv"
 nameRawFile = prefixRaw % "scrapped_data_name.csv"
 steamRawFile = prefixRaw % "steam_games.json"
 hltbSinkFile = prefixProcessed % "scrapped_data_complete.csv"
+hltbImageRawFile = prefixRaw % "scrapped_data_image.csv"
+hltbImageSinkFile = prefixProcessed % "scrapped_data_complete_image.csv"
 steamSinkFile = prefixProcessed % "steam_games_processed.json"
+
+# COMMAND ----------
 
 # Función para limpiar el nombre
 def cleanName(row):
@@ -99,16 +104,40 @@ dfHltbProcessed = spark.read.option("header", "true").format("csv").load(hltbSin
 dfFinal = dfSteamGames.join(dfHltbProcessed, "Name").select("hltbIndex", "steamIndex", "Name", "Main", "Main + Sides", "Completionist", "All Styles")
 
 # Guardamos los datos en la base de datos
-dfHltbProcessed.write.format('jdbc').options( \
-      url=dbUrl, \
-      database=dbName, \
-      dbtable=dbTableHltb, \
-      user=dbUser, \
-      password=dbPass).mode('overwrite').save()
-      
 dfFinal.write.format('jdbc').options( \
       url=dbUrl, \
       database=dbName, \
       dbtable=dbTableFinal, \
       user=dbUser, \
       password=dbPass).mode('overwrite').save()
+
+
+# COMMAND ----------
+
+def cleanImage(row):
+    try:
+        newRow = re.split("\"/>", re.split("src=\"", row)[1])[0]
+    except:
+        newRow = ""
+    for key in replaceList:
+        newRow = newRow.replace(key, replaceList[key])
+    newRow = newRow.replace("\"", "")
+    return newRow
+
+udfCleanImage =  udf(lambda row: cleanImage(row), StringType())
+
+dfProcessed = spark.read.option("header", "true").format("csv").load(hltbSinkFile)
+dfImagen = spark.read.option("header", "true").format("csv").load(hltbImageRawFile).drop("_c0").withColumn("Image", udfCleanImage(col("imageSrc"))).drop("imageSrc")
+
+dfProcessedImagen = dfProcessed.join(dfImagen, "hltbIndex", "left").withColumns({"hltbIndex": col("hltbIndex").cast(IntegerType()),"Main": col("Main").cast(DoubleType()),"Main + Sides": col("Main + Sides").cast(DoubleType()),"Completionist": col("Completionist").cast(DoubleType()),"All Styles": col("All Styles").cast(DoubleType())})
+
+# COMMAND ----------
+
+dfProcessedImagen.write.format('jdbc').options( \
+      url=dbUrl, \
+      database=dbName, \
+      dbtable=dbTableHltb, \
+      user=dbUser, \
+      password=dbPass).mode('overwrite').save()
+
+saveDf(dfProcessedImagen,hltbImageSinkFile)
